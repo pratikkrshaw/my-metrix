@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "My Metrix",
+  "version": "1.0.0",
+  "description": "Quick productivity dashboard by Pratik.",
+  "author": "Pratik",
+  "permissions": [
+    "storage",
+    "tabs",
+    "cookies"
+  ],
+  "host_permissions": [
+    "https://orgcs.my.salesforce.com/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src https://orgcs.my.salesforce.com;"
+  },
+  "action": {
+    "default_popup": "sidepanel.html",
+    "default_title": "My Metrix — Open Productivity Dashboard",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

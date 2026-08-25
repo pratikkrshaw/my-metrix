@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Metrix</title>
+  <link rel="stylesheet" href="sidepanel.css" />
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <div class="header">
+    <div class="header-left">
+      <img src="icons/icon48.png" class="logo-mark" alt="My Metrix" />
+      <div class="title-block">
+        <span class="app-name">My Metrix</span>
+        <span class="app-sub">by Pratik</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button id="btn-theme" class="icon-btn" title="Toggle dark mode">🌙</button>
+      <button id="btn-refresh" class="icon-btn" title="Refresh data">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
+          <path d="M3.5 10A6.5 6.5 0 1 0 5 5.5" stroke-linecap="round"/>
+          <polyline points="3.5,3 3.5,5.5 6,5.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Month bar ── -->
+  <div class="month-bar">
+    <span class="month-bar-eyebrow">Viewing</span>
+    <div class="month-picker" id="month-picker">
+      <button class="month-picker-btn" id="month-picker-btn" type="button">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11" style="opacity:0.8">
+          <rect x="2" y="2" width="12" height="12" rx="2"/>
+          <path d="M5 2v2M11 2v2M2 7h12" stroke-linecap="round"/>
+        </svg>
+        <span id="month-picker-label">Loading…</span>
+        <svg class="month-picker-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" width="11" height="11">
+          <polyline points="4,6 8,10 12,6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="month-picker-dropdown" id="month-picker-dropdown"></div>
+    </div>
+  </div>
+
+  <!-- ── Dashboard ── -->
+  <div id="view-dashboard">
+
+    <!-- Row 1: Productivity (full width) -->
+    <div class="card card-full" id="card-prod">
+      <div class="card-header">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
+          <rect x="2" y="10" width="3" height="8" rx="1"/>
+          <rect x="8.5" y="6" width="3" height="12" rx="1"/>
+          <rect x="15" y="2" width="3" height="16" rx="1"/>
+        </svg>
+        <span>Closure Productivity</span>
+        <span class="status-dot" id="dot-prod"></span>
+      </div>
+      <div class="card-val" id="prod-mine">—</div>
+      <div class="card-trend" id="prod-trend"></div>
+      <div class="leave-wrap">
+        <div class="leave-row">
+          <span class="leave-label">Leave days this month</span>
+          <div class="leave-ctrl">
+            <button id="btn-leave-minus" class="leave-btn">−</button>
+            <span id="leave-count">0</span>
+            <button id="btn-leave-plus" class="leave-btn">+</button>
+          </div>
+        </div>
+        <div id="leave-note" class="leave-note"></div>
+      </div>
+    </div>
+
+    <!-- Row 2: CSAT + Closed Cases -->
+    <div class="card-row">
+      <div class="card" id="card-csat">
+        <div class="card-header">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
+            <path d="M10 1l2.39 4.84L18 6.91l-4 3.9.94 5.5L10 13.77l-4.94 2.54.94-5.5-4-3.9 5.61-.07z"/>
+          </svg>
+          <span>CSAT Score</span>
+          <span class="status-dot" id="dot-csat"></span>
+        </div>
+        <div class="card-val" id="csat-mine">—</div>
+        <div class="card-trend" id="csat-trend"></div>
+      </div>
+
+      <div class="card card-clickable" id="card-closed">
+        <div class="card-header">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
+            <path d="M4 4h12a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/>
+            <path d="M7 9l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Closed Cases</span>
+          <span class="status-dot" id="dot-closed"></span>
+        </div>
+        <div class="card-val" id="closed-mine">—</div>
+        <div class="card-trend" id="closed-trend"></div>
+        <div class="card-drill-hint">Tap to view list</div>
+      </div>
+    </div>
+
+    <!-- Case list panel -->
+    <div id="case-list-panel" class="case-list-panel hidden">
+      <div class="case-list-header">
+        <button id="btn-case-list-back" class="case-list-back">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+            <polyline points="10,3 5,8 10,13" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Back
+        </button>
+        <span class="case-list-title">Closed Cases</span>
+      </div>
+      <div id="case-list-body"></div>
+    </div>
+
+    <!-- Row 3: Return Rate + Survey Count -->
+    <div class="card-row">
+      <div class="card" id="card-survey-rate">
+        <div class="card-header">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
+            <path d="M10 2a8 8 0 1 1 0 16A8 8 0 0 1 10 2z"/>
+            <path d="M10 6v4l3 2" stroke-linecap="round"/>
+          </svg>
+          <span>Return Rate</span>
+          <span class="status-dot" id="dot-survey-rate"></span>
+        </div>
+        <div class="card-val" id="survey-rate-mine">—</div>
+        <div class="card-trend" id="survey-rate-trend"></div>
+      </div>
+
+      <div class="card" id="card-survey-count">
+        <div class="card-header">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
+            <path d="M4 5h12M4 10h8M4 15h5" stroke-linecap="round"/>
+          </svg>
+          <span>Survey Count</span>
+          <span class="status-dot" id="dot-survey-count"></span>
+        </div>
+        <div class="card-val" id="survey-mine">—</div>
+        <div class="card-trend" id="survey-trend"></div>
+      </div>
+    </div>
+
+    <!-- Row 4: TTR -->
+    <div class="card card-full" id="card-ttr">
+      <div class="card-header">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14">
+          <circle cx="10" cy="10" r="8"/>
+          <path d="M10 6v4l2.5 2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Avg TTR (Business Hours)</span>
+        <span class="status-dot" id="dot-ttr"></span>
+      </div>
+      <div class="card-val" id="ttr-mine">—</div>
+      <div class="card-trend" id="ttr-trend"></div>
+    </div>
+
+    <!-- Tableau button + status -->
+    <button id="btn-open-full" class="tableau-btn">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+        <rect x="3" y="3" width="6" height="6" rx="1.5"/>
+        <rect x="11" y="3" width="6" height="6" rx="1.5"/>
+        <rect x="3" y="11" width="6" height="6" rx="1.5"/>
+        <rect x="11" y="11" width="6" height="6" rx="1.5"/>
+      </svg>
+      Open Tableau Dashboard
+    </button>
+
+    <div class="status-bar">
+      <span id="status-text">Click Refresh to load data</span>
+      <span id="last-updated"></span>
+    </div>
+
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
