@@ -124,13 +124,45 @@ function workingDaysInRange(year, month, isCurrentMonth, leaveDays, tz) {
   return Math.max(0, count - (leaveDays || 0));
 }
 
-const DAILY_TARGET = 2.3;
+const TOPIC_TARGETS = {
+  'Service-How-to, Setup, Configuration, Data Management':            { daily: 2.88, newbie: 1.73 },
+  'Service-Developer Support':                                         { daily: 1.66, newbie: 0.99 },
+  'Service-Flow':                                                      { daily: 1.66, newbie: 0.99 },
+  'Service-Email Delivery & Desktop Integrations':                     { daily: 1.87, newbie: 1.12 },
+  'Service-Digital Engagement':                                        { daily: 1.66, newbie: 0.99 },
+  'Service-Experience Builder and Content Management':                 { daily: 1.66, newbie: 0.99 },
+  'Service-Service Cloud Voice':                                       { daily: 1.66, newbie: 0.99 },
+  'Service-Mobile Apps':                                               { daily: 1.87, newbie: 1.12 },
+  'Service-Security & Activations':                                    { daily: 1.87, newbie: 1.12 },
+  'Service-Field Service':                                             { daily: 1.66, newbie: 0.99 },
+  'Service-Experience Management and Workspaces':                      { daily: 1.66, newbie: 0.99 },
+  'Community / Experience-Experience Builder and Content Management':  { daily: 1.66, newbie: 0.99 },
+  'Service-Network Infrastructure and Core Maintenance':               { daily: 1.87, newbie: 1.12 },
+  'Service-Tableau CRM & Einstein Discovery':                          { daily: 1.66, newbie: 0.99 },
+  'Service-CRM Analytics':                                             { daily: 1.66, newbie: 0.99 },
+  'Service-Cases, Knowledge, Service Cloud Console, Work.com':         { daily: 1.66, newbie: 0.99 },
+  'Service-Reports and Dashboards':                                    { daily: 2.88, newbie: 1.73 },
+  'Core-Chat':                                                         { daily: 5.40, newbie: 3.24 },
+  'Agentforce-Service':                                                { daily: 1.66, newbie: 0.99 },
+  'Data Cloud-Data Cloud':                                             { daily: 1.66, newbie: 0.99 },
+  'Service-Agentforce IT Service':                                     { daily: 1.66, newbie: 0.99 },
+  'Service-AppExchange & Managed Packages':                            { daily: 1.66, newbie: 0.99 },
+  'Service-Prompt Builder':                                            { daily: 1.66, newbie: 0.99 },
+  'Sales-Mandatory Security Controls':                                 { daily: 1.87, newbie: 1.12 },
+  'Service-Mandatory Security Controls':                               { daily: 1.87, newbie: 1.12 },
+};
 
-function calcProductivityWeighted(eligibleCount, leaveDays, year, month, isCurrentMonth, tz) {
+function getDailyTarget(topic, isNewbie) {
+  const t = TOPIC_TARGETS[topic];
+  if (!t) return isNewbie ? 0.99 : 1.66;
+  return isNewbie ? t.newbie : t.daily;
+}
+
+function calcProductivityWeighted(eligibleCount, dailyTarget, leaveDays, year, month, isCurrentMonth, tz) {
   if (eligibleCount == null) return null;
   const workingDays = workingDaysInRange(year, month, isCurrentMonth, leaveDays, tz);
   if (workingDays === 0) return null;
-  return (eligibleCount / (DAILY_TARGET * workingDays)) * 100;
+  return (eligibleCount / (dailyTarget * workingDays)) * 100;
 }
 
 // ── Leave day counter (keyed per month) ──────────────────────────────────────
@@ -171,11 +203,33 @@ async function getSfSession() {
   if (!userId || !SF_ID_RE.test(userId)) throw new Error('Invalid session — please log in to Salesforce again.');
 
   const userResp = await fetch(`${base}/query/?q=${encodeURIComponent(`SELECT Support_Region__c, TimeZoneSidKey FROM User WHERE Id = '${userId}'`)}`, { headers });
-  const userRec      = userResp.ok ? ((await userResp.json()).records?.[0] ?? {}) : {};
+  const userRec       = userResp.ok ? ((await userResp.json()).records?.[0] ?? {}) : {};
   const supportRegion = userRec.Support_Region__c ?? 'AMER';
   const tzSidKey      = userRec.TimeZoneSidKey ?? 'America/Los_Angeles';
 
-  return { sessionId: cookie.value, userId, supportRegion, tzSidKey };
+  // Fetch tier and primary topic from ServiceResource + ServiceResourceSkill
+  let isNewbie = false;
+  let topic    = null;
+  try {
+    const srResp = await fetch(`${base}/query/?q=${encodeURIComponent(`SELECT Id, Current_Tier__c FROM ServiceResource WHERE RelatedRecordId = '${userId}' LIMIT 1`)}`, { headers });
+    if (srResp.ok) {
+      const srRec = (await srResp.json()).records?.[0];
+      if (srRec) {
+        const tier = (srRec.Current_Tier__c || '').toLowerCase();
+        isNewbie   = tier.includes('newbie') || tier.includes('new');
+
+        const skillResp = await fetch(`${base}/query/?q=${encodeURIComponent(`SELECT Skill.MasterLabel FROM ServiceResourceSkill WHERE ServiceResourceId = '${srRec.Id}' AND (ExpirationDate = null OR ExpirationDate > TODAY) ORDER BY CreatedDate DESC LIMIT 20`)}`, { headers });
+        if (skillResp.ok) {
+          const skills = (await skillResp.json()).records ?? [];
+          const labels = skills.map(s => s.Skill?.MasterLabel || '');
+          // Match first skill label that corresponds to a known topic
+          topic = labels.find(l => TOPIC_TARGETS[l]) ?? null;
+        }
+      }
+    }
+  } catch (_) { /* non-fatal — fall back to defaults */ }
+
+  return { sessionId: cookie.value, userId, supportRegion, tzSidKey, isNewbie, topic };
 }
 
 // ── Salesforce queries ────────────────────────────────────────────────────────
@@ -360,18 +414,19 @@ function calcAvgTTR(cases, supportRegion) {
 async function fetchDashboardData() {
   const { year, month, isCurrentMonth } = getSelectedMonth();
   try {
-    const { sessionId, userId, supportRegion, tzSidKey } = await getSfSession();
+    const { sessionId, userId, supportRegion, tzSidKey, isNewbie, topic } = await getSfSession();
     const [{ total: closedCases, eligibleCases }, { csat, surveyCount }, leaveDays, cases] = await Promise.all([
       fetchSfClosedCases(sessionId, userId, year, month),
       fetchSfSurveyData(sessionId, userId, year, month),
       getLeaveDays(year, month),
       fetchCaseList(sessionId, userId, year, month),
     ]);
-    const avgTTR = calcAvgTTR(cases, supportRegion);
-    return { closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, supportRegion, tzSidKey, year, month, isCurrentMonth };
+    const avgTTR     = calcAvgTTR(cases, supportRegion);
+    const dailyTarget = getDailyTarget(topic, isNewbie);
+    return { closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, supportRegion, tzSidKey, isNewbie, topic, dailyTarget, year, month, isCurrentMonth };
   } catch (_) {
     const leaveDays = await getLeaveDays(year, month);
-    return { closedCases: null, eligibleCases: null, csat: null, surveyCount: null, leaveDays, avgTTR: null, supportRegion: 'AMER', tzSidKey: 'America/Los_Angeles', year, month, isCurrentMonth };
+    return { closedCases: null, eligibleCases: null, csat: null, surveyCount: null, leaveDays, avgTTR: null, supportRegion: 'AMER', tzSidKey: 'America/Los_Angeles', isNewbie: false, topic: null, dailyTarget: 1.66, year, month, isCurrentMonth };
   }
 }
 
@@ -408,7 +463,7 @@ function setValColor(elId, status) {
 
 // ── Render dashboard ──────────────────────────────────────────────────────────
 
-function renderDashboard({ closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, tzSidKey, year, month, isCurrentMonth }) {
+function renderDashboard({ closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, tzSidKey, isNewbie, topic, dailyTarget, year, month, isCurrentMonth }) {
   // Closed Cases
   el('closed-mine').textContent = fmtCount(closedCases);
 
@@ -475,13 +530,16 @@ function renderDashboard({ closedCases, eligibleCases, csat, surveyCount, leaveD
     ? `Adjusted for ${leaveDays} leave day${leaveDays > 1 ? 's' : ''} — ${wDays} working days`
     : '';
 
-  // Productivity — Tableau uses total closed cases (not GHO-filtered)
-  const prod = calcProductivityWeighted(closedCases, leaveDays, year, month, isCurrentMonth, tzSidKey);
+  // Productivity — uses per-topic daily target, auto-detected from ServiceResource skills + tier
+  const prod = calcProductivityWeighted(closedCases, dailyTarget, leaveDays, year, month, isCurrentMonth, tzSidKey);
+  const topicLabel = topic ? topic.replace(/^[^-]+-/, '') : null; // strip prefix e.g. "Service-"
+  const tierLabel  = isNewbie ? 'Newbie' : 'Experienced';
   if (prod == null) {
     el('prod-mine').textContent = '—';
     setValColor('prod-mine', null);
     setValColor('closed-mine', null);
-    el('prod-trend').textContent  = '';
+    el('prod-trend').textContent  = topicLabel ? `${topicLabel} · ${tierLabel} · ${dailyTarget}/day` : '';
+    el('prod-trend').style.color  = '';
     el('closed-trend').textContent = '';
     setCardStatus('card-prod',   'dot-prod',   null);
     setCardStatus('card-closed', 'dot-closed', null);
@@ -490,8 +548,9 @@ function renderDashboard({ closedCases, eligibleCases, csat, surveyCount, leaveD
     el('prod-mine').textContent = Math.round(prod) + '%';
     setValColor('prod-mine',   prodStatus);
     setValColor('closed-mine', prodStatus);
-    el('prod-trend').textContent   = prod > 100 ? '✓ Above target (100%)' : prod === 100 ? '● At target (100%)' : '↓ Below target (100%)';
-    el('prod-trend').style.color   = prodStatus === 'green' ? 'var(--success)' : prodStatus === 'orange' ? 'var(--warning)' : 'var(--danger)';
+    const statusLine = prod > 100 ? '✓ Above target (100%)' : prod === 100 ? '● At target (100%)' : '↓ Below target (100%)';
+    el('prod-trend').textContent  = topicLabel ? `${statusLine}  ·  ${topicLabel} · ${tierLabel} · ${dailyTarget}/day` : statusLine;
+    el('prod-trend').style.color  = prodStatus === 'green' ? 'var(--success)' : prodStatus === 'orange' ? 'var(--warning)' : 'var(--danger)';
     el('closed-trend').textContent = '';
     setCardStatus('card-prod',   'dot-prod',   prodStatus);
     setCardStatus('card-closed', 'dot-closed', prodStatus);
