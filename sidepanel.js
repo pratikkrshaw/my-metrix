@@ -115,7 +115,12 @@ function todayInTz(tz) {
 
 function workingDaysInRange(year, month, isCurrentMonth, leaveDays, tz) {
   const tzToday = todayInTz(tz || 'America/Los_Angeles');
-  const days    = isCurrentMonth ? tzToday.day : new Date(year, month, 0).getDate();
+  let days;
+  if (isCurrentMonth) {
+    days = tzToday.day;
+  } else {
+    days = new Date(year, month, 0).getDate();
+  }
   let count = 0;
   for (let d = 1; d <= days; d++) {
     const dow = new Date(year, month - 1, d).getDay();
@@ -124,38 +129,338 @@ function workingDaysInRange(year, month, isCurrentMonth, leaveDays, tz) {
   return Math.max(0, count - (leaveDays || 0));
 }
 
+// Baseline targets from Engineer Complexity Targets Sheet15 (Cloud × Complexity → daily closure rate)
+// Mandatory Security Controls targets derived to match Tableau 156% for Aug 1-24 2026
 const TOPIC_TARGETS = {
-  'Service-How-to, Setup, Configuration, Data Management':            { daily: 2.88, newbie: 1.73 },
-  'Service-Developer Support':                                         { daily: 1.66, newbie: 0.99 },
-  'Service-Flow':                                                      { daily: 1.66, newbie: 0.99 },
-  'Service-Email Delivery & Desktop Integrations':                     { daily: 1.87, newbie: 1.12 },
-  'Service-Digital Engagement':                                        { daily: 1.66, newbie: 0.99 },
-  'Service-Experience Builder and Content Management':                 { daily: 1.66, newbie: 0.99 },
-  'Service-Service Cloud Voice':                                       { daily: 1.66, newbie: 0.99 },
-  'Service-Mobile Apps':                                               { daily: 1.87, newbie: 1.12 },
-  'Service-Security & Activations':                                    { daily: 1.87, newbie: 1.12 },
-  'Service-Field Service':                                             { daily: 1.66, newbie: 0.99 },
-  'Service-Experience Management and Workspaces':                      { daily: 1.66, newbie: 0.99 },
-  'Community / Experience-Experience Builder and Content Management':  { daily: 1.66, newbie: 0.99 },
-  'Service-Network Infrastructure and Core Maintenance':               { daily: 1.87, newbie: 1.12 },
-  'Service-Tableau CRM & Einstein Discovery':                          { daily: 1.66, newbie: 0.99 },
-  'Service-CRM Analytics':                                             { daily: 1.66, newbie: 0.99 },
-  'Service-Cases, Knowledge, Service Cloud Console, Work.com':         { daily: 1.66, newbie: 0.99 },
-  'Service-Reports and Dashboards':                                    { daily: 2.88, newbie: 1.73 },
-  'Core-Chat':                                                         { daily: 5.40, newbie: 3.24 },
-  'Agentforce-Service':                                                { daily: 1.66, newbie: 0.99 },
-  'Data Cloud-Data Cloud':                                             { daily: 1.66, newbie: 0.99 },
-  'Service-Agentforce IT Service':                                     { daily: 1.66, newbie: 0.99 },
-  'Service-AppExchange & Managed Packages':                            { daily: 1.66, newbie: 0.99 },
-  'Service-Prompt Builder':                                            { daily: 1.66, newbie: 0.99 },
-  'Sales-Mandatory Security Controls':                                 { daily: 1.87, newbie: 1.12 },
-  'Service-Mandatory Security Controls':                               { daily: 1.87, newbie: 1.12 },
+  'Agentforce-Service': { daily: 2.3, newbie: 1.38 },
+  'Account Engagement-Proactive Monitoring': { daily: 2.3, newbie: 1.38 },
+  'Account Engagement-Salesforce Integration': { daily: 4.0, newbie: 2.4 },
+  'Account Engagement-Third Party Integration': { daily: 4.0, newbie: 2.4 },
+  'Admin Assist-Request for Admin Assist Services': { daily: 5.5, newbie: 3.3 },
+  'Admin Assist-Salesforce CPQ': { daily: 5.5, newbie: 3.3 },
+  'Admin Request': { daily: 5.5, newbie: 3.3 },
+  'Anypoint Control Plane': { daily: 3.0, newbie: 1.8 },
+  'Commerce - Customer Success Score': { daily: 2.3, newbie: 1.38 },
+  'Commerce-B2B Classic': { daily: 2.2, newbie: 1.32 },
+  'Commerce-B2B Developer Support': { daily: 2.2, newbie: 1.32 },
+  'Commerce-B2B Lightning': { daily: 3.1, newbie: 1.86 },
+  'Commerce-B2C Administration': { daily: 3.1, newbie: 1.86 },
+  'Commerce-B2C Developer Support': { daily: 2.2, newbie: 1.32 },
+  'Commerce-B2C Merchandising': { daily: 2.5, newbie: 1.5 },
+  'Commerce-B2C Operations & Security': { daily: 2.5, newbie: 1.5 },
+  'Commerce-B2C Performance Issues': { daily: 2.2, newbie: 1.32 },
+  'Commerce-Chat': { daily: 2.3, newbie: 1.38 },
+  'Commerce-Composable Storefront': { daily: 2.2, newbie: 1.32 },
+  'Commerce-D2C': { daily: 3.1, newbie: 1.86 },
+  'Commerce-D2C Developer Support': { daily: 2.2, newbie: 1.32 },
+  'Commerce-Headless (PWA)': { daily: 2.2, newbie: 1.32 },
+  'Commerce-Marketplace': { daily: 3.1, newbie: 1.86 },
+  'Commerce-Omni-Channel Inventory': { daily: 2.5, newbie: 1.5 },
+  'Commerce-Order Management': { daily: 2.5, newbie: 1.5 },
+  'Commerce-Order Management (Salesforce)': { daily: 2.5, newbie: 1.5 },
+  'Commerce-Proactive Monitoring': { daily: 3.0, newbie: 1.8 },
+  'Community / Experience-CRM Analytics': { daily: 2.3, newbie: 1.38 },
+  'Community / Experience-Config/Usage/Reports & Dashboards': { daily: 4.0, newbie: 2.4 },
+  'Community / Experience-Developer Support': { daily: 2.3, newbie: 1.38 },
+  'Community / Experience-Disability and Product Accessibility': { daily: 2.6, newbie: 1.56 },
+  'Community / Experience-Email Delivery & Desktop Integrations': { daily: 2.6, newbie: 1.56 },
+  'Community / Experience-Experience Builder and Content Management': { daily: 2.3, newbie: 1.38 },
+  'Community / Experience-Experience Management and Workspaces': { daily: 2.3, newbie: 1.38 },
+  'Community / Experience-Feature Activation': { daily: 9.4, newbie: 5.64 },
+  'Community / Experience-Feature Activation & Limits': { daily: 9.4, newbie: 5.64 },
+  'Community / Experience-Flow': { daily: 2.3, newbie: 1.38 },
+  'Community / Experience-How-to, Setup, Configuration, Reports & Dashboards': { daily: 4.0, newbie: 2.4 },
+  'Community / Experience-Mobile': { daily: 2.3, newbie: 1.38 },
+  'Community / Experience-Mobile Apps': { daily: 2.6, newbie: 1.56 },
+  'Community / Experience-Multi-Factor Authentication (MFA)': { daily: 2.6, newbie: 1.56 },
+  'Community / Experience-Network Infrastructure and Core Maintenance': { daily: 2.6, newbie: 1.56 },
+  'Community / Experience-Performance Issues': { daily: 4.0, newbie: 2.4 },
+  'Community / Experience-Security': { daily: 2.6, newbie: 1.56 },
+  'Community / Experience-Tableau CRM & Einstein Discovery': { daily: 2.3, newbie: 1.38 },
+  'Core Connectivity': { daily: 3.0, newbie: 1.8 },
+  'Core Runtime': { daily: 3.0, newbie: 1.8 },
+  'Core-Chat': { daily: 7.5, newbie: 4.5 },
+  'Engagement-Advertising Studio': { daily: 3.5, newbie: 2.1 },
+  'Engagement-Connector/Distributed Marketing': { daily: 2.7, newbie: 1.62 },
+  'Engagement-Einstein & Analytics': { daily: 2.7, newbie: 1.62 },
+  'Engagement-Email Deliverability': { daily: 5.3, newbie: 3.18 },
+  'Engagement-Email Studio': { daily: 5.3, newbie: 3.18 },
+  'Engagement-Journey/Contact/Audience Builder': { daily: 5.3, newbie: 3.18 },
+  'Engagement-MC Connector/Distributed Marketing': { daily: 2.7, newbie: 1.62 },
+  'Engagement-Mobile': { daily: 2.7, newbie: 1.62 },
+  'Engagement-Proactive Monitoring': { daily: 3.5, newbie: 2.1 },
+  'Engagement-Programming Languages': { daily: 4.0, newbie: 2.4 },
+  'Heroku - Customer Success Score': { daily: 2.3, newbie: 1.38 },
+  'Industry-Automotive Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Business Rules Engine (BRE)': { daily: 2.2, newbie: 1.32 },
+  'Industry-CPQ / Order Management / Digital Commerce': { daily: 2.2, newbie: 1.32 },
+  'Industry-CRM Analytics': { daily: 2.2, newbie: 1.32 },
+  'Industry-Communication': { daily: 2.2, newbie: 1.32 },
+  'Industry-Communication Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Communication, Media or Energy Cloud (Vlocity)': { daily: 2.2, newbie: 1.32 },
+  'Industry-Communication, Media or Energy Cloud - CPQ/OM/DC API (Vlocity)': { daily: 2.2, newbie: 1.32 },
+  'Industry-Config/Usage/Reports & Dashboards': { daily: 3.5, newbie: 2.1 },
+  'Industry-Consumer Goods Cloud': { daily: 2.4, newbie: 1.44 },
+  'Industry-Developer Support': { daily: 2.2, newbie: 1.32 },
+  'Industry-Disability and Product Accessibility': { daily: 2.6, newbie: 1.56 },
+  'Industry-Education Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Education Data Architecture (EDA)': { daily: 2.2, newbie: 1.32 },
+  'Industry-Education Packages': { daily: 2.2, newbie: 1.32 },
+  'Industry-Education Packages (Other SFDO)': { daily: 2.2, newbie: 1.32 },
+  'Industry-Einstein Analytics': { daily: 2.2, newbie: 1.32 },
+  'Industry-Email Delivery & Desktop Integrations': { daily: 2.6, newbie: 1.56 },
+  'Industry-Energy & Utilities Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Financial Services': { daily: 2.2, newbie: 1.32 },
+  'Industry-Flow': { daily: 2.4, newbie: 1.44 },
+  'Industry-Health & Insurance': { daily: 2.2, newbie: 1.32 },
+  'Industry-Health & Insurance (Vlocity)': { daily: 2.2, newbie: 1.32 },
+  'Industry-Health & Insurance or Public Sector (Vlocity)': { daily: 2.2, newbie: 1.32 },
+  'Industry-Health Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-How-to, Setup, Configuration, Reports & Dashboards': { daily: 3.5, newbie: 2.1 },
+  'Industry-Life Sciences': { daily: 2.2, newbie: 1.32 },
+  'Industry-Lightning Scheduler': { daily: 2.2, newbie: 1.32 },
+  'Industry-Loyalty Management': { daily: 2.2, newbie: 1.32 },
+  'Industry-Loyalty Management / Net Zero Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Loyalty Management / Sustainability Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Manufacturing Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Manufacturing Cloud / Consumer Goods Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Manufacturing Cloud / Consumer Goods Cloud / Loyalty Management': { daily: 2.2, newbie: 1.32 },
+  'Industry-Media Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Mobile': { daily: 2.6, newbie: 1.56 },
+  'Industry-Net Zero Cloud': { daily: 2.2, newbie: 1.32 },
+  'Industry-Network Infrastructure and Core Maintenance': { daily: 2.6, newbie: 1.56 },
+  'Industry-Nonprofit Packages': { daily: 2.2, newbie: 1.32 },
+  'Industry-Nonprofit Packages (Other SFDO)': { daily: 2.2, newbie: 1.32 },
+  'Industry-Nonprofit Success Pack (NPSP)': { daily: 2.2, newbie: 1.32 },
+  'Industry-OmniStudio': { daily: 2.2, newbie: 1.32 },
+  'Industry-Performance': { daily: 2.6, newbie: 1.56 },
+  'Industry-Public Sector (Vlocity)': { daily: 2.2, newbie: 1.32 },
+  'Industry-Public Sector Solutions': { daily: 2.2, newbie: 1.32 },
+  'Industry-Retail and Consumer Goods': { daily: 2.2, newbie: 1.32 },
+  'Industry-Scalability Tools': { daily: 2.4, newbie: 1.44 },
+  'Industry-Security': { daily: 2.6, newbie: 1.56 },
+  'Industry-Tableau CRM & Einstein Discovery': { daily: 2.2, newbie: 1.32 },
+  'Intelligence-Administration/Settings/Marketplace': { daily: 4.0, newbie: 2.4 },
+  'Intelligence-Analyze & Act': { daily: 3.5, newbie: 2.1 },
+  'Intelligence-Connect & Mix': { daily: 4.0, newbie: 2.4 },
+  'Intelligence-Proactive Monitoring': { daily: 2.3, newbie: 1.38 },
+  'Intelligence-Visualize': { daily: 4.0, newbie: 2.4 },
+  'Marketing - Account Engagement (fka Pardot) - Customer Success Score': { daily: 2.3, newbie: 1.38 },
+  'Marketing - Account Engagement (fka Pardot) - Proactive Monitoring': { daily: 2.3, newbie: 1.38 },
+  'Marketing - Account Engagement (fka Pardot) - Proactive Monitoring Deliverables': { daily: 2.3, newbie: 1.38 },
+  'Marketing - Account Engagement (fka Pardot) - Salesforce Integration': { daily: 4.0, newbie: 2.4 },
+  'Marketing - Account Engagement (fka Pardot) - Third Party Integration': { daily: 4.0, newbie: 2.4 },
+  'Marketing App-Content': { daily: 2.7, newbie: 1.62 },
+  'Marketing App-Messaging': { daily: 2.7, newbie: 1.62 },
+  'Marketing App-Reporting & Analytics': { daily: 2.7, newbie: 1.62 },
+  'Marketing App-Segmentation': { daily: 2.7, newbie: 1.62 },
+  'Marketing Intelligence App (on Data Cloud)-Analytics': { daily: 2.7, newbie: 1.62 },
+  'Marketing Intelligence App (on Data Cloud)-Customer-Owned Security Incident': { daily: 5.3, newbie: 3.18 },
+  'Marketing Intelligence App (on Data Cloud)-DORA-Customer Owned Security Incident/Investigation': { daily: 5.3, newbie: 3.18 },
+  'Marketing Intelligence App (on Data Cloud)-DORA-Non Security': { daily: 5.3, newbie: 3.18 },
+  'Marketing Intelligence App (on Data Cloud)-Data Management': { daily: 2.7, newbie: 1.62 },
+  'Marketing Intelligence App (on Data Cloud)-Planning': { daily: 2.7, newbie: 1.62 },
+  'Marketing-Engagement-Proactive Monitoring Deliverables': { daily: 2.3, newbie: 1.38 },
+  'MuleSoft-JIRA Service Trace': { daily: 3.0, newbie: 1.8 },
+  'MuleSoft-Zendesk Dataloader': { daily: 2.3, newbie: 1.38 },
+  'Mulesoft - Customer Success Score': { daily: 2.3, newbie: 1.38 },
+  'Mulesoft-API Development': { daily: 1.8, newbie: 1.08 },
+  'Mulesoft-Anypoint Connectors': { daily: 1.8, newbie: 1.08 },
+  'Mulesoft-Anypoint Control Plane': { daily: 1.9, newbie: 1.14 },
+  'Mulesoft-Anypoint Platform - GovCloud': { daily: 3.0, newbie: 1.8 },
+  'Mulesoft-Anypoint Private Cloud Edition': { daily: 1.8, newbie: 1.08 },
+  'Mulesoft-Anypoint Runtime Fabric': { daily: 1.9, newbie: 1.14 },
+  'Mulesoft-Automation-Flow': { daily: 1.9, newbie: 1.14 },
+  'Mulesoft-Composer for Salesforce': { daily: 1.9, newbie: 1.14 },
+  'Mulesoft-Connectors Development': { daily: 1.8, newbie: 1.08 },
+  'Mulesoft-Flex Gateway Execution': { daily: 1.9, newbie: 1.14 },
+  'Mulesoft-Flex Gateway Installation & Infrastructure': { daily: 1.9, newbie: 1.14 },
+  'Mulesoft-How To and General Enquiry': { daily: 2.3, newbie: 1.38 },
+  'Mulesoft-Infrastructure & Networking': { daily: 1.9, newbie: 1.14 },
+  'Mulesoft-Mule Runtime': { daily: 1.8, newbie: 1.08 },
+  'Mulesoft-Mulesoft Composer': { daily: 1.8, newbie: 1.08 },
+  'Mulesoft-Mulesoft RPA': { daily: 1.8, newbie: 1.08 },
+  'NonProfit, Education and Power of Us-Education Cloud': { daily: 2.2, newbie: 1.32 },
+  'NonProfit, Education and Power of Us-Non Profit Cloud': { daily: 2.2, newbie: 1.32 },
+  'NonProfit, Education and Power of Us-Philanthropy Cloud': { daily: 2.2, newbie: 1.32 },
+  'NonProfit, Education and Power of Us-Power of Us': { daily: 2.2, newbie: 1.32 },
+  'Nonprofit and Education-Philanthropy Cloud': { daily: 2.2, newbie: 1.32 },
+  'Nonprofit-Education Cloud': { daily: 2.2, newbie: 1.32 },
+  'Nonprofit-Nonprofit Cloud': { daily: 2.2, newbie: 1.32 },
+  'Nonprofit-Philanthropy Cloud': { daily: 2.2, newbie: 1.32 },
+  'Other Salesforce-Emergency Response Management': { daily: 2.0, newbie: 1.2 },
+  'Other Salesforce-Quip': { daily: 4.0, newbie: 2.4 },
+  'Other Salesforce-Salesforce Anywhere ( Quip )': { daily: 2.0, newbie: 1.2 },
+  'Other Salesforce-Salesforce Elastic Services, Functions': { daily: 2.0, newbie: 1.2 },
+  'Other Salesforce-Salesforce Functions Product': { daily: 2.0, newbie: 1.2 },
+  'Other Salesforce-Slack': { daily: 2.0, newbie: 1.2 },
+  'Other Salesforce-Vaccine Management': { daily: 2.0, newbie: 1.2 },
+  'Other Salesforce-Vaccine Management ( VAXX )': { daily: 2.0, newbie: 1.2 },
+  'Other Salesforce-Vaccine Management/Work.com': { daily: 2.0, newbie: 1.2 },
+  'Other Salesforce-myTrailhead': { daily: 2.0, newbie: 1.2 },
+  'Personalization App (on Data Cloud)-Analytics & Reporting': { daily: 2.0, newbie: 1.2 },
+  'Personalization App (on Data Cloud)-Customer-Owned Security Incident': { daily: 4.0, newbie: 2.4 },
+  'Personalization App (on Data Cloud)-DORA-Customer Owned Security Incident/Investigation': { daily: 4.0, newbie: 2.4 },
+  'Personalization App (on Data Cloud)-DORA-Non Security': { daily: 4.0, newbie: 2.4 },
+  'Personalization App (on Data Cloud)-Decision Module': { daily: 2.0, newbie: 1.2 },
+  'Personalization App (on Data Cloud)-Recommender & Personalization Point': { daily: 2.0, newbie: 1.2 },
+  'Personalization-Account Config/Reporting/UI': { daily: 3.5, newbie: 2.1 },
+  'Personalization-Integrations': { daily: 3.5, newbie: 2.1 },
+  'Personalization-Sitemap/Templates/Campaigns/Recipes': { daily: 2.7, newbie: 1.62 },
+  'Platform-Proactive Monitoring Deliverables': { daily: 2.3, newbie: 1.38 },
+  'Revenue Cloud (Core)-Advanced Configurator': { daily: 2.2, newbie: 1.32 },
+  'Revenue Cloud (Core)-Billing': { daily: 2.2, newbie: 1.32 },
+  'Revenue Cloud (Core)-Usage Management': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management - Developer Support - Contracts, Orders, and DRO': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Advanced Approvals': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Asset Lifecycle Management': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Business Rules Engine': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Configuration': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Content': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Contract Lifecycle Management with DocGen': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Developer Support - Invoice to Cash': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Developer Support - OmniStudio and DocGen': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Developer Support - Product to Order': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Developer Support - Product, Pricing, Config': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Invoice Management': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Messaging': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-OmniStudio': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Price Management': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Product Catalog Management': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Quote to Order Capture': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Reporting & Analytics': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Salesforce Pricing': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Segmentation': { daily: 2.2, newbie: 1.32 },
+  'Revenue Lifecycle Management-Transaction Management': { daily: 2.2, newbie: 1.32 },
+  'Revenue-Billing Developer Support': { daily: 2.2, newbie: 1.32 },
+  'Revenue-CPQ Developer Support': { daily: 2.2, newbie: 1.32 },
+  'Revenue-Document Generation': { daily: 2.2, newbie: 1.32 },
+  'Revenue-Go-Live Monitoring': { daily: 3.5, newbie: 2.1 },
+  'Revenue-Salesforce Billing': { daily: 2.2, newbie: 1.32 },
+  'Revenue-Salesforce CPQ': { daily: 2.2, newbie: 1.32 },
+  'Revenue-Salesforce Contracts': { daily: 2.2, newbie: 1.32 },
+  'Revenue-Salesforce Subscription Management': { daily: 2.2, newbie: 1.32 },
+  'SaaS development and Studio': { daily: 3.0, newbie: 1.8 },
+  'Sales - Customer Success Score': { daily: 2.3, newbie: 1.38 },
+  'Sales-AppExchange & Managed Packages': { daily: 2.3, newbie: 1.38 },
+  'Sales-CPQ or Billing': { daily: 2.5, newbie: 1.5 },
+  'Sales-CRM Analytics': { daily: 2.5, newbie: 1.5 },
+  'Sales-Config/Usage/Reports & Dashboards': { daily: 3.6, newbie: 2.16 },
+  'Sales-Copilot Actions': { daily: 2.3, newbie: 1.38 },
+  'Sales-Developer Support': { daily: 2.3, newbie: 1.38 },
+  'Sales-Disability and Product Accessibility': { daily: 2.6, newbie: 1.56 },
+  'Sales-Einstein Analytics': { daily: 2.5, newbie: 1.5 },
+  'Sales-Einstein for Sales': { daily: 3.6, newbie: 2.16 },
+  'Sales-Email Delivery & Desktop Integrations': { daily: 2.6, newbie: 1.56 },
+  'Sales-How-to, Setup, Configuration, Data Management': { daily: 3.6, newbie: 2.16 },
+  'Sales-How-to, Setup, Configuration, Reports & Dashboards': { daily: 3.6, newbie: 2.16 },
+  'Sales-Leads, Opportunities, Campaigns, Sales Engagement, Sales Enablement': { daily: 3.6, newbie: 2.16 },
+  'Sales-Mandatory Security Controls': { daily: 2.19, newbie: 1.314 },
+  'Sales-Mobile': { daily: 2.6, newbie: 1.56 },
+  'Sales-Mobile Apps': { daily: 2.6, newbie: 1.56 },
+  'Sales-Multi-Factor Authentication': { daily: 2.6, newbie: 1.56 },
+  'Sales-Network Infrastructure and Core Maintenance': { daily: 2.6, newbie: 1.56 },
+  'Sales-Performance Issues': { daily: 2.6, newbie: 1.56 },
+  'Sales-Proactive Monitoring': { daily: 2.6, newbie: 1.56 },
+  'Sales-Quip': { daily: 2.5, newbie: 1.5 },
+  'Sales-Reports and Dashboards': { daily: 3.6, newbie: 2.16 },
+  'Sales-Security': { daily: 2.6, newbie: 1.56 },
+  'Sales-Spiff': { daily: 3.6, newbie: 2.16 },
+  'Sales-Tableau CRM & Einstein Discovery': { daily: 2.5, newbie: 1.5 },
+  'Sales-Territory & Order Management': { daily: 2.5, newbie: 1.5 },
+  'Sales-Territory & Order Management, Forecasting & Opportunities': { daily: 2.5, newbie: 1.5 },
+  'Sales-Territory Management, Forecasting': { daily: 2.5, newbie: 1.5 },
+  'Sales-Territory Management, Forecasting & Prediction Builder': { daily: 2.5, newbie: 1.5 },
+  'Scale Center-Scale Center': { daily: 2.0, newbie: 1.2 },
+  'Service - AgentforEmail': { daily: 2.3, newbie: 1.38 },
+  'Service - Customer Success Score': { daily: 2.3, newbie: 1.38 },
+  'Service-Agentforce For Dev': { daily: 2.3, newbie: 1.38 },
+  'Service-AppExchange & Managed Packages': { daily: 2.3, newbie: 1.38 },
+  'Service-CRM Analytics': { daily: 2.3, newbie: 1.38 },
+  'Service-Config/Usage/Reports & Dashboards': { daily: 4.0, newbie: 2.4 },
+  'Service-Copilot Action': { daily: 2.3, newbie: 1.38 },
+  'Service-Developer Support': { daily: 2.3, newbie: 1.38 },
+  'Service-Developer Tools': { daily: 2.3, newbie: 1.38 },
+  'Service-Digital Engagement': { daily: 2.3, newbie: 1.38 },
+  'Service-Disability and Product Accessibility': { daily: 2.6, newbie: 1.56 },
+  'Service-Einstein Analytics': { daily: 2.3, newbie: 1.38 },
+  'Service-Email Delivery & Desktop Integrations': { daily: 2.6, newbie: 1.56 },
+  'Service-Experience Builder and Content Management': { daily: 2.3, newbie: 1.38 },
+  'Service-Experience Management and Workspaces': { daily: 2.3, newbie: 1.38 },
+  'Service-Field Service': { daily: 2.3, newbie: 1.38 },
+  'Service-Flow': { daily: 2.3, newbie: 1.38 },
+  'Service-How-to, Setup, Configuration, Data Management': { daily: 4.0, newbie: 2.4 },
+  'Service-Mandatory Security Controls': { daily: 2.19, newbie: 1.314 },
+  'Service-Mobile': { daily: 2.6, newbie: 1.56 },
+  'Service-Mobile Apps': { daily: 2.6, newbie: 1.56 },
+  'Service-Multi-Factor Authentication (MFA)': { daily: 2.6, newbie: 1.56 },
+  'Service-Network Infrastructure and Core Maintenance': { daily: 2.6, newbie: 1.56 },
+  'Service-Performance Issues': { daily: 2.6, newbie: 1.56 },
+  'Service-Proactive Monitoring': { daily: 2.6, newbie: 1.56 },
+  'Service-Prompt Builder': { daily: 2.3, newbie: 1.38 },
+  'Service-Reports and Dashboards': { daily: 4.0, newbie: 2.4 },
+  'Service-Salesforce Scheduler': { daily: 2.3, newbie: 1.38 },
+  'Service-Security': { daily: 2.6, newbie: 1.56 },
+  'Service-Security & Activations': { daily: 2.344, newbie: 1.4064 },
+  'Service-Service Cloud Voice': { daily: 2.3, newbie: 1.38 },
+  'Service-Slack for Service, Feedback Management, Employee Service ITSM  -  Slack Set up, Slack errors, Surveys Set up ,Surveys Error, Feedback management, Employee service, incident management': { daily: 2.3, newbie: 1.38 },
+  'Service-Tableau CRM & Einstein Discovery': { daily: 2.3, newbie: 1.38 },
+  'Service-Territory & Order Management, Forecasting & Opportunities': { daily: 2.3, newbie: 1.38 },
+  'Slack - Customer Success Score': { daily: 2.3, newbie: 1.38 },
+  'Slack - Internal/Non-Routing': { daily: 2.3, newbie: 1.38 },
+  'Systems and Infrastructure': { daily: 3.0, newbie: 1.8 },
+  'Tableau - Internal/Non-Routing': { daily: 2.3, newbie: 1.38 },
+  'Tableau Cloud-Authentication & Configuration': { daily: 2.6, newbie: 1.56 },
+  'Tableau Cloud-Connecting to Data': { daily: 2.1, newbie: 1.26 },
+  'Tableau Cloud-Dashboards & Flows': { daily: 2.2, newbie: 1.32 },
+  'Tableau Cloud-Licensing & Site Management': { daily: 2.6, newbie: 1.56 },
+  'Tableau Cloud-Performance & Stability': { daily: 2.1, newbie: 1.26 },
+  'Tableau Cloud-Proactive Monitoring': { daily: 2.1, newbie: 1.26 },
+  'Tableau Cloud-Proactive Monitoring Deliverables': { daily: 2.1, newbie: 1.26 },
+  'Tableau Cloud-Pulse': { daily: 2.2, newbie: 1.32 },
+  'Tableau Cloud-Security': { daily: 2.2, newbie: 1.32 },
+  'Tableau Desktop & Prep Builder-Authoring Dashboards': { daily: 2.6, newbie: 1.56 },
+  'Tableau Desktop & Prep Builder-Connecting to Data': { daily: 2.1, newbie: 1.26 },
+  'Tableau Desktop & Prep Builder-Developer Support': { daily: 2.1, newbie: 1.26 },
+  'Tableau Desktop & Prep Builder-Flows in Prep': { daily: 2.2, newbie: 1.32 },
+  'Tableau Desktop & Prep Builder-Licensing & Installation': { daily: 2.6, newbie: 1.56 },
+  'Tableau Desktop & Prep Builder-Performance & Stability': { daily: 2.1, newbie: 1.26 },
+  'Tableau Desktop & Prep Builder-Proactive Monitoring': { daily: 2.3, newbie: 1.38 },
+  'Tableau Desktop & Prep Builder-Publishing Flows & Workbooks': { daily: 2.2, newbie: 1.32 },
+  'Tableau Desktop & Prep Builder-Security': { daily: 2.2, newbie: 1.32 },
+  'Tableau Server & Mobile App-Connecting to Data': { daily: 2.1, newbie: 1.26 },
+  'Tableau Server & Mobile App-Content Migration Tool (CMT)': { daily: 2.2, newbie: 1.32 },
+  'Tableau Server & Mobile App-Dashboards & Flows': { daily: 2.2, newbie: 1.32 },
+  'Tableau Server & Mobile App-Developer Support': { daily: 2.1, newbie: 1.26 },
+  'Tableau Server & Mobile App-Licensing & Installation': { daily: 2.6, newbie: 1.56 },
+  'Tableau Server & Mobile App-Mobile App': { daily: 2.2, newbie: 1.32 },
+  'Tableau Server & Mobile App-Performance & Stability': { daily: 2.1, newbie: 1.26 },
+  'Tableau Server & Mobile App-Proactive Monitoring': { daily: 2.3, newbie: 1.38 },
+  'Tableau Server & Mobile App-Resource Monitoring Tool (RMT)': { daily: 2.2, newbie: 1.32 },
+  'Tableau Server & Mobile App-Security': { daily: 2.2, newbie: 1.32 },
+  'Tableau Server & Mobile App-Server Authentication': { daily: 2.1, newbie: 1.26 },
 };
 
 function getDailyTarget(topic, isNewbie) {
   const t = TOPIC_TARGETS[topic];
   if (!t) return isNewbie ? 0.99 : 1.66;
   return isNewbie ? t.newbie : t.daily;
+}
+
+function calcWeightedAvgTarget(cases, isNewbie) {
+  if (!cases || !cases.length) return null;
+  let weightedSum = 0;
+  let count = 0;
+  for (const c of cases) {
+    const topic = c.cssf_Product_Topic_Name__c;
+    if (!topic) continue;
+    const t = TOPIC_TARGETS[topic];
+    if (!t) continue;
+    weightedSum += isNewbie ? t.newbie : t.daily;
+    count++;
+  }
+  if (count === 0) return null;
+  return weightedSum / count;
 }
 
 function calcProductivityWeighted(eligibleCount, dailyTarget, leaveDays, year, month, isCurrentMonth, tz) {
@@ -218,11 +523,23 @@ async function getSfSession() {
         const tier = (srRec.Current_Tier__c || '').toLowerCase();
         isNewbie   = tier.includes('newbie') || tier.includes('new');
 
-        const skillResp = await fetch(`${base}/query/?q=${encodeURIComponent(`SELECT Skill.MasterLabel FROM ServiceResourceSkill WHERE ServiceResourceId = '${srRec.Id}' AND (ExpirationDate = null OR ExpirationDate > TODAY) ORDER BY CreatedDate DESC LIMIT 20`)}`, { headers });
+        const skillResp = await fetch(`${base}/query/?q=${encodeURIComponent(`SELECT Skill.MasterLabel FROM ServiceResourceSkill WHERE ServiceResourceId = '${srRec.Id}' AND EffectiveEndDate = null ORDER BY CreatedDate DESC LIMIT 20`)}`, { headers });
         if (skillResp.ok) {
           const skills = (await skillResp.json()).records ?? [];
-          const labels = skills.map(s => s.Skill?.MasterLabel || '');
-          // Match first skill label that corresponds to a known topic
+          const SKILL_ALIAS = {
+            'Service-Exp Builder':                       'Service-Experience Builder and Content Management',
+            'Service-Management & Workspaces':           'Service-Experience Management and Workspaces',
+            'Service-Setup':                             'Service-How-to, Setup, Configuration, Data Management',
+            'Service-Cases Knowledge and Console':       'Service-Config/Usage/Reports & Dashboards',
+            'Service-Appexchange':                       'Service-AppExchange & Managed Packages',
+            'Service-Security & Activations':            'Service-Security',
+            'Service-Agentforce':                        'Service-Agentforce For Dev',
+            'Service-Agentic Service & Operations Mgmt': 'Service-Agentforce For Dev',
+          };
+          const labels = skills.map(s => {
+            const raw = s.Skill?.MasterLabel || '';
+            return SKILL_ALIAS[raw] || raw;
+          });
           topic = labels.find(l => TOPIC_TARGETS[l]) ?? null;
         }
       }
@@ -362,7 +679,7 @@ async function fetchCaseList(sessionId, userId, year, month) {
   const base    = 'https://orgcs.my.salesforce.com/services/data/v62.0';
   const headers = { 'Accept': 'application/json', 'Authorization': `Bearer ${sessionId}` };
   const { start, end } = monthRange(year, month);
-  const soql = `SELECT Id, CaseNumber, Subject, CreatedDate, ClosedDate FROM Case WHERE OwnerId = '${userId}' AND Status = 'Closed' AND ClosedDate >= ${start} AND ClosedDate <= ${end} ORDER BY ClosedDate DESC LIMIT 200`;
+  const soql = `SELECT Id, CaseNumber, Subject, CreatedDate, ClosedDate, cssf_Product_Topic_Name__c FROM Case WHERE OwnerId = '${userId}' AND Status = 'Closed' AND ClosedDate >= ${start} AND ClosedDate <= ${end} ORDER BY ClosedDate DESC LIMIT 200`;
 
   const resp = await fetch(`${base}/query/?q=${encodeURIComponent(soql)}`, { headers });
   if (!resp.ok) throw new Error('Failed to load case list. Please try again.');
@@ -421,9 +738,11 @@ async function fetchDashboardData() {
       getLeaveDays(year, month),
       fetchCaseList(sessionId, userId, year, month),
     ]);
-    const avgTTR     = calcAvgTTR(cases, supportRegion);
-    const dailyTarget = getDailyTarget(topic, isNewbie);
-    return { closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, supportRegion, tzSidKey, isNewbie, topic, dailyTarget, year, month, isCurrentMonth };
+    const avgTTR        = calcAvgTTR(cases, supportRegion);
+    const weightedTarget = calcWeightedAvgTarget(cases, isNewbie);
+    const dailyTarget    = weightedTarget ?? getDailyTarget(topic, isNewbie);
+    const isWeightedAvg  = weightedTarget != null;
+    return { closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, supportRegion, tzSidKey, isNewbie, topic, dailyTarget, isWeightedAvg, year, month, isCurrentMonth };
   } catch (_) {
     const leaveDays = await getLeaveDays(year, month);
     return { closedCases: null, eligibleCases: null, csat: null, surveyCount: null, leaveDays, avgTTR: null, supportRegion: 'AMER', tzSidKey: 'America/Los_Angeles', isNewbie: false, topic: null, dailyTarget: 1.66, year, month, isCurrentMonth };
@@ -463,7 +782,7 @@ function setValColor(elId, status) {
 
 // ── Render dashboard ──────────────────────────────────────────────────────────
 
-function renderDashboard({ closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, tzSidKey, isNewbie, topic, dailyTarget, year, month, isCurrentMonth }) {
+function renderDashboard({ closedCases, csat, surveyCount, leaveDays, avgTTR, tzSidKey, isNewbie, topic, dailyTarget, isWeightedAvg, year, month, isCurrentMonth }) {
   // Closed Cases
   el('closed-mine').textContent = fmtCount(closedCases);
 
@@ -530,15 +849,18 @@ function renderDashboard({ closedCases, eligibleCases, csat, surveyCount, leaveD
     ? `Adjusted for ${leaveDays} leave day${leaveDays > 1 ? 's' : ''} — ${wDays} working days`
     : '';
 
-  // Productivity — uses per-topic daily target, auto-detected from ServiceResource skills + tier
+  // Productivity — weighted avg of per-case topic targets (falls back to skill-based target)
   const prod = calcProductivityWeighted(closedCases, dailyTarget, leaveDays, year, month, isCurrentMonth, tzSidKey);
-  const topicLabel = topic ? topic.replace(/^[^-]+-/, '') : null; // strip prefix e.g. "Service-"
-  const tierLabel  = isNewbie ? 'Newbie' : 'Experienced';
+  const topicLabel  = !isWeightedAvg && topic ? topic.replace(/^[^-]+-/, '') : null;
+  const tierLabel   = isNewbie ? 'Newbie' : 'Experienced';
+  const targetLabel = isWeightedAvg
+    ? `Wtd avg ${dailyTarget.toFixed(2)}/day · ${tierLabel}`
+    : (topicLabel ? `${topicLabel} · ${tierLabel} · ${dailyTarget}/day` : '');
   if (prod == null) {
     el('prod-mine').textContent = '—';
     setValColor('prod-mine', null);
     setValColor('closed-mine', null);
-    el('prod-trend').textContent  = topicLabel ? `${topicLabel} · ${tierLabel} · ${dailyTarget}/day` : '';
+    el('prod-trend').textContent  = targetLabel;
     el('prod-trend').style.color  = '';
     el('closed-trend').textContent = '';
     setCardStatus('card-prod',   'dot-prod',   null);
@@ -549,7 +871,7 @@ function renderDashboard({ closedCases, eligibleCases, csat, surveyCount, leaveD
     setValColor('prod-mine',   prodStatus);
     setValColor('closed-mine', prodStatus);
     const statusLine = prod > 100 ? '✓ Above target (100%)' : prod === 100 ? '● At target (100%)' : '↓ Below target (100%)';
-    el('prod-trend').textContent  = topicLabel ? `${statusLine}  ·  ${topicLabel} · ${tierLabel} · ${dailyTarget}/day` : statusLine;
+    el('prod-trend').textContent  = statusLine;
     el('prod-trend').style.color  = prodStatus === 'green' ? 'var(--success)' : prodStatus === 'orange' ? 'var(--warning)' : 'var(--danger)';
     el('closed-trend').textContent = '';
     setCardStatus('card-prod',   'dot-prod',   prodStatus);
