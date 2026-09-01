@@ -538,10 +538,9 @@ async function getSfSession() {
   const userId = (await meResp.json()).id;
   if (!userId || !SF_ID_RE.test(userId)) throw new Error('Invalid session — please log in to Salesforce again.');
 
-  const userResp = await fetch(`${base}/query/?q=${encodeURIComponent(`SELECT Support_Region__c, TimeZoneSidKey FROM User WHERE Id = '${userId}'`)}`, { headers });
+  const userResp = await fetch(`${base}/query/?q=${encodeURIComponent(`SELECT Support_Region__c FROM User WHERE Id = '${userId}'`)}`, { headers });
   const userRec       = userResp.ok ? ((await userResp.json()).records?.[0] ?? {}) : {};
   const supportRegion = userRec.Support_Region__c ?? 'AMER';
-  const tzSidKey      = userRec.TimeZoneSidKey ?? 'America/Los_Angeles';
 
   // Fetch tier and primary topic from ServiceResource + ServiceResourceSkill
   let isNewbie = false;
@@ -577,7 +576,7 @@ async function getSfSession() {
     }
   } catch (_) { /* non-fatal — fall back to defaults */ }
 
-  return { sessionId: cookie.value, userId, supportRegion, tzSidKey, isNewbie, topic };
+  return { sessionId: cookie.value, userId, supportRegion, isNewbie, topic };
 }
 
 // ── Salesforce queries ────────────────────────────────────────────────────────
@@ -762,7 +761,7 @@ function calcAvgTTR(cases, supportRegion) {
 async function fetchDashboardData() {
   const { year, month } = getSelectedMonth();
   try {
-    const { sessionId, userId, supportRegion, tzSidKey, isNewbie, topic } = await getSfSession();
+    const { sessionId, userId, supportRegion, isNewbie, topic } = await getSfSession();
     const regionTz = REGION_TZ[supportRegion] || REGION_TZ.AMER;
     // isCurrentMonth must use the region's local date, not UTC, so engineers in IST see Sep correctly
     const regionToday = todayInTz(regionTz);
@@ -777,12 +776,12 @@ async function fetchDashboardData() {
     const weightedTarget = calcWeightedAvgTarget(cases, isNewbie);
     const dailyTarget    = weightedTarget ?? getDailyTarget(topic, isNewbie);
     const isWeightedAvg  = weightedTarget != null;
-    return { closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, supportRegion, tzSidKey, isNewbie, topic, dailyTarget, isWeightedAvg, year, month, isCurrentMonth };
+    return { closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, supportRegion, isNewbie, topic, dailyTarget, isWeightedAvg, year, month, isCurrentMonth };
   } catch (_) {
     const leaveDays = await getLeaveDays(year, month);
     const regionToday = todayInTz(REGION_TZ.AMER);
     const isCurrentMonth = year === regionToday.year && month === regionToday.month;
-    return { closedCases: null, eligibleCases: null, csat: null, surveyCount: null, leaveDays, avgTTR: null, supportRegion: 'AMER', tzSidKey: 'America/Los_Angeles', isNewbie: false, topic: null, dailyTarget: 1.66, year, month, isCurrentMonth };
+    return { closedCases: null, eligibleCases: null, csat: null, surveyCount: null, leaveDays, avgTTR: null, supportRegion: 'AMER', isNewbie: false, topic: null, dailyTarget: 1.66, year, month, isCurrentMonth };
   }
 }
 
@@ -819,7 +818,8 @@ function setValColor(elId, status) {
 
 // ── Render dashboard ──────────────────────────────────────────────────────────
 
-function renderDashboard({ closedCases, csat, surveyCount, leaveDays, avgTTR, tzSidKey, isNewbie, topic, dailyTarget, isWeightedAvg, year, month, isCurrentMonth }) {
+function renderDashboard({ closedCases, csat, surveyCount, leaveDays, avgTTR, supportRegion, isNewbie, topic, dailyTarget, isWeightedAvg, year, month, isCurrentMonth }) {
+  const regionTz = REGION_TZ[supportRegion] || REGION_TZ.AMER;
   // Closed Cases
   el('closed-mine').textContent = fmtCount(closedCases);
 
@@ -881,13 +881,13 @@ function renderDashboard({ closedCases, csat, surveyCount, leaveDays, avgTTR, tz
 
   // Leave counter
   el('leave-count').textContent = leaveDays || 0;
-  const wDays = workingDaysInRange(year, month, isCurrentMonth, leaveDays, tzSidKey);
+  const wDays = workingDaysInRange(year, month, isCurrentMonth, leaveDays, regionTz);
   el('leave-note').textContent = (leaveDays > 0)
     ? `Adjusted for ${leaveDays} leave day${leaveDays > 1 ? 's' : ''} — ${wDays} working days`
     : '';
 
   // Productivity — weighted avg of per-case topic targets (falls back to skill-based target)
-  const prod = calcProductivityWeighted(closedCases, dailyTarget, leaveDays, year, month, isCurrentMonth, tzSidKey);
+  const prod = calcProductivityWeighted(closedCases, dailyTarget, leaveDays, year, month, isCurrentMonth, regionTz);
   const topicLabel  = !isWeightedAvg && topic ? topic.replace(/^[^-]+-/, '') : null;
   const tierLabel   = isNewbie ? 'Newbie' : 'Experienced';
   const targetLabel = isWeightedAvg
