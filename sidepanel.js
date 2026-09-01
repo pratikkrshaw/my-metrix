@@ -760,10 +760,13 @@ function calcAvgTTR(cases, supportRegion) {
 }
 
 async function fetchDashboardData() {
-  const { year, month, isCurrentMonth } = getSelectedMonth();
+  const { year, month } = getSelectedMonth();
   try {
     const { sessionId, userId, supportRegion, tzSidKey, isNewbie, topic } = await getSfSession();
     const regionTz = REGION_TZ[supportRegion] || REGION_TZ.AMER;
+    // isCurrentMonth must use the region's local date, not UTC, so engineers in IST see Sep correctly
+    const regionToday = todayInTz(regionTz);
+    const isCurrentMonth = year === regionToday.year && month === regionToday.month;
     const [{ total: closedCases, eligibleCases }, { csat, surveyCount }, leaveDays, cases] = await Promise.all([
       fetchSfClosedCases(sessionId, userId, year, month, regionTz),
       fetchSfSurveyData(sessionId, userId, year, month, regionTz),
@@ -777,6 +780,8 @@ async function fetchDashboardData() {
     return { closedCases, eligibleCases, csat, surveyCount, leaveDays, avgTTR, supportRegion, tzSidKey, isNewbie, topic, dailyTarget, isWeightedAvg, year, month, isCurrentMonth };
   } catch (_) {
     const leaveDays = await getLeaveDays(year, month);
+    const regionToday = todayInTz(REGION_TZ.AMER);
+    const isCurrentMonth = year === regionToday.year && month === regionToday.month;
     return { closedCases: null, eligibleCases: null, csat: null, surveyCount: null, leaveDays, avgTTR: null, supportRegion: 'AMER', tzSidKey: 'America/Los_Angeles', isNewbie: false, topic: null, dailyTarget: 1.66, year, month, isCurrentMonth };
   }
 }
