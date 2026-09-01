@@ -24,7 +24,7 @@ function monthLabel(year, month) {
   return new Date(year, month - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' });
 }
 
-function monthRange(year, month) {
+function monthRange(year, month, tz) {
   const y = parseInt(year, 10);
   const m = parseInt(month, 10);
   if (!Number.isInteger(y) || !Number.isInteger(m) || y < 2000 || y > 2100 || m < 1 || m > 12) {
@@ -32,9 +32,33 @@ function monthRange(year, month) {
   }
   const mm   = String(m).padStart(2, '0');
   const last = new Date(y, m, 0).getDate();
+  const dd   = String(last).padStart(2, '0');
+  if (!tz) {
+    return { start: `${y}-${mm}-01T00:00:00Z`, end: `${y}-${mm}-${dd}T23:59:59Z` };
+  }
+  // Convert local midnight start/end to UTC using the engineer's timezone
+  const toUTC = (localIso) => {
+    try {
+      // Find the UTC offset at this local datetime in the given tz
+      const d = new Date(localIso + 'Z'); // treat as UTC first to get a Date object
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      }).formatToParts(d);
+      const get = type => parts.find(p => p.type === type).value;
+      const localStr = `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`;
+      // Offset = UTC time - local time (in ms)
+      const offset = d.getTime() - new Date(localStr + 'Z').getTime();
+      // Apply offset to the desired local time
+      const localDate = new Date(localIso + 'Z');
+      return new Date(localDate.getTime() + offset).toISOString().replace('.000Z', 'Z');
+    } catch (_) {
+      return localIso + 'Z';
+    }
+  };
   return {
-    start: `${y}-${mm}-01T00:00:00Z`,
-    end:   `${y}-${mm}-${String(last).padStart(2, '0')}T23:59:59Z`,
+    start: toUTC(`${y}-${mm}-01T00:00:00`),
+    end:   toUTC(`${y}-${mm}-${dd}T23:59:59`),
   };
 }
 
@@ -551,10 +575,10 @@ async function getSfSession() {
 
 // ── Salesforce queries ────────────────────────────────────────────────────────
 
-async function fetchSfClosedCases(sessionId, userId, year, month) {
+async function fetchSfClosedCases(sessionId, userId, year, month, tz) {
   const base    = 'https://orgcs.my.salesforce.com/services/data/v62.0';
   const headers = { 'Accept': 'application/json', 'Authorization': `Bearer ${sessionId}` };
-  const { start, end } = monthRange(year, month);
+  const { start, end } = monthRange(year, month, tz);
 
   const totalSoql    = `SELECT COUNT(Id) cnt FROM Case WHERE OwnerId = '${userId}' AND Status = 'Closed' AND ClosedDate >= ${start} AND ClosedDate <= ${end}`;
   const eligibleSoql = `SELECT COUNT(Id) cnt FROM Case WHERE OwnerId = '${userId}' AND Status = 'Closed' AND (GHO__c = false OR GHO_Type__c = 'Active') AND ClosedDate >= ${start} AND ClosedDate <= ${end}`;
@@ -571,10 +595,10 @@ async function fetchSfClosedCases(sessionId, userId, year, month) {
   return { total, eligibleCases };
 }
 
-async function fetchSfSurveyData(sessionId, userId, year, month) {
+async function fetchSfSurveyData(sessionId, userId, year, month, tz) {
   const base    = 'https://orgcs.my.salesforce.com/services/data/v62.0';
   const headers = { 'Accept': 'application/json', 'Authorization': `Bearer ${sessionId}` };
-  const { start, end } = monthRange(year, month);
+  const { start, end } = monthRange(year, month, tz);
   const soql = `SELECT AVG(Technical_Support_Satisfaction_Score__c) avgScore, COUNT(Id) cnt FROM Survey_Results__c WHERE Case_Owner__c = '${userId}' AND COMPLETIONTIME__c >= ${start} AND COMPLETIONTIME__c <= ${end}`;
 
   const resp = await fetch(`${base}/query/?q=${encodeURIComponent(soql)}`, { headers });
@@ -675,10 +699,10 @@ function fmtBizAge(hours, hoursPerDay) {
 
 // ── Case list fetch ───────────────────────────────────────────────────────────
 
-async function fetchCaseList(sessionId, userId, year, month) {
+async function fetchCaseList(sessionId, userId, year, month, tz) {
   const base    = 'https://orgcs.my.salesforce.com/services/data/v62.0';
   const headers = { 'Accept': 'application/json', 'Authorization': `Bearer ${sessionId}` };
-  const { start, end } = monthRange(year, month);
+  const { start, end } = monthRange(year, month, tz);
   const soql = `SELECT Id, CaseNumber, Subject, CreatedDate, ClosedDate, cssf_Product_Topic_Name__c FROM Case WHERE OwnerId = '${userId}' AND Status = 'Closed' AND ClosedDate >= ${start} AND ClosedDate <= ${end} ORDER BY ClosedDate DESC LIMIT 200`;
 
   const resp = await fetch(`${base}/query/?q=${encodeURIComponent(soql)}`, { headers });
@@ -733,10 +757,10 @@ async function fetchDashboardData() {
   try {
     const { sessionId, userId, supportRegion, tzSidKey, isNewbie, topic } = await getSfSession();
     const [{ total: closedCases, eligibleCases }, { csat, surveyCount }, leaveDays, cases] = await Promise.all([
-      fetchSfClosedCases(sessionId, userId, year, month),
-      fetchSfSurveyData(sessionId, userId, year, month),
+      fetchSfClosedCases(sessionId, userId, year, month, tzSidKey),
+      fetchSfSurveyData(sessionId, userId, year, month, tzSidKey),
       getLeaveDays(year, month),
-      fetchCaseList(sessionId, userId, year, month),
+      fetchCaseList(sessionId, userId, year, month, tzSidKey),
     ]);
     const avgTTR        = calcAvgTTR(cases, supportRegion);
     const weightedTarget = calcWeightedAvgTarget(cases, isNewbie);
