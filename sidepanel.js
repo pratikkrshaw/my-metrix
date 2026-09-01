@@ -519,6 +519,13 @@ const REGION_BIZ_HOURS = {
   APAC: { startUTC:  0 * 60, endUTC:  9 * 60, hpd:  9 }, // 00:00–09:00 UTC
 };
 
+// Month boundary timezone per support region — so ClosedDate filtering aligns with the region's working day
+const REGION_TZ = {
+  AMER: 'America/New_York',
+  EMEA: 'Europe/Dublin',
+  APAC: 'Asia/Kolkata',
+};
+
 async function getSfSession() {
   const cookie = await chrome.cookies.get({ url: 'https://orgcs.my.salesforce.com', name: 'sid' });
   if (!cookie?.value) throw new Error('Not logged in — please open orgcs in a tab first.');
@@ -756,11 +763,12 @@ async function fetchDashboardData() {
   const { year, month, isCurrentMonth } = getSelectedMonth();
   try {
     const { sessionId, userId, supportRegion, tzSidKey, isNewbie, topic } = await getSfSession();
+    const regionTz = REGION_TZ[supportRegion] || REGION_TZ.AMER;
     const [{ total: closedCases, eligibleCases }, { csat, surveyCount }, leaveDays, cases] = await Promise.all([
-      fetchSfClosedCases(sessionId, userId, year, month, tzSidKey),
-      fetchSfSurveyData(sessionId, userId, year, month, tzSidKey),
+      fetchSfClosedCases(sessionId, userId, year, month, regionTz),
+      fetchSfSurveyData(sessionId, userId, year, month, regionTz),
       getLeaveDays(year, month),
-      fetchCaseList(sessionId, userId, year, month, tzSidKey),
+      fetchCaseList(sessionId, userId, year, month, regionTz),
     ]);
     const avgTTR        = calcAvgTTR(cases, supportRegion);
     const weightedTarget = calcWeightedAvgTarget(cases, isNewbie);
