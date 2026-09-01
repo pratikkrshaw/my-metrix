@@ -519,9 +519,9 @@ const REGION_BIZ_HOURS = {
   APAC: { startUTC:  0 * 60, endUTC:  9 * 60, hpd:  9 }, // 00:00–09:00 UTC
 };
 
-// Month boundary timezone per support region — so ClosedDate filtering aligns with the region's working day
+// Month boundary timezone per support region — so ClosedDate filtering aligns with the region's calendar day
 const REGION_TZ = {
-  AMER: 'America/New_York',
+  AMER: 'America/Los_Angeles', // Pacific Time — AMER region day ends at PT midnight
   EMEA: 'Europe/Dublin',
   APAC: 'Asia/Kolkata',
 };
